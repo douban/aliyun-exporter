@@ -23,7 +23,6 @@ var config struct {
 }
 
 func main() {
-	log.Println("start")
 	flag.StringVar(&(config.accessKeyId), "id", os.Getenv("ACCESS_KEY_ID"), "阿里云AccessKey ID")
 	flag.StringVar(&(config.accessKeySecret), "secret", os.Getenv("ACCESS_KEY_SECRET"), "阿里云AccessKey Secret")
 	flag.StringVar(&(config.regionId), "region", os.Getenv("REGIONID"), "阿里云Region ID")
