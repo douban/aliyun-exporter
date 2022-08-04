@@ -30,6 +30,7 @@ func main() {
 	flag.IntVar(&(config.port), "port", 9180, "服务监听端口")
 	flag.StringVar(&(config.service), "service", "acs_cdn", "输出Metrics的服务，默认为全部")
 	flag.Parse()
+	
 	serviceArr := strings.Split(config.service, ",")
 	for _, ae := range serviceArr {
 		switch ae {
