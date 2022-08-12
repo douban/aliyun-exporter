@@ -50,10 +50,10 @@ func retrieve(metric string, p Project) []datapoint {
 	source, err := getResponseFunc(p.client, request)
 	if err != nil {
 		responseError.Inc()
-		log.Fatal(err)
+		log.Fatal("Encounter response error from Aliyun:", err)
 	} else if err := json.Unmarshal([]byte(source), &datapoints); err != nil {
 		responseFormatError.Inc()
-		log.Fatal(err)
+		log.Fatal("Cannot decode json reponse:",err)
 	}
 	return datapoints
 }
