@@ -13,7 +13,7 @@ func newCdnClient() *cms.Client {
 	)
 	//log.Println("testcms")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("client init failed",err)
 	}
 
 	return cdnClient
