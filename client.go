@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/cms"
 )
 
