@@ -26,6 +26,7 @@ type Project struct {
 func defaultGetResponseFunc(client *cms.Client, request *cms.DescribeMetricLastRequest) (string, error) {
 	response, err := client.DescribeMetricLast(request)
 	if err != nil {
+		log.Fatal(err)
 		return "", err
 	} else {
 		return response.Datapoints, nil
@@ -49,10 +50,10 @@ func retrieve(metric string, p Project) []datapoint {
 	source, err := getResponseFunc(p.client, request)
 	if err != nil {
 		responseError.Inc()
-		log.Println("Encounter response error from Aliyun:", err)
+		log.Fatal("Encounter response error from Aliyun:", err)
 	} else if err := json.Unmarshal([]byte(source), &datapoints); err != nil {
 		responseFormatError.Inc()
-		log.Println("Cannot decode json reponse:", err)
+		log.Fatal("Cannot decode json reponse:",err)
 	}
 	return datapoints
 }
