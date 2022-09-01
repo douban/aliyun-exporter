@@ -20,6 +20,7 @@ var config struct {
 	host            string
 	port            int
 	service         string
+	metricsPath     string
 }
 
 func main() {
@@ -29,6 +30,7 @@ func main() {
 	flag.StringVar(&(config.host), "host", "0.0.0.0", "服务监听地址")
 	flag.IntVar(&(config.port), "port", 9180, "服务监听端口")
 	flag.StringVar(&(config.service), "service", "acs_cdn", "输出Metrics的服务，默认为全部")
+	flag.StringVar(&(config.metricsPath), "metricsPath", "/metrics", "metrics path 路径, 默认为 /metrics ")
 	flag.Parse()
 
 	serviceArr := strings.Split(config.service, ",")
@@ -45,6 +47,17 @@ func main() {
 	listenAddress := net.JoinHostPort(config.host, strconv.Itoa(config.port))
 	log.Println(listenAddress)
 	log.Println("Running on", listenAddress)
-	http.Handle("/metrics", promhttp.Handler())
+	http.Handle(config.metricsPath, promhttp.Handler())
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`<html>
+             <head><title>Aliyun Cloud CDN Exporter</title></head>
+             <body>
+             <h1>Aliyun cloud cdn exporter</h1>
+             <p><a href='` + config.metricsPath + `'>Metrics</a></p>
+             </body>
+             </html>`))
+	})
+
 	log.Fatal(http.ListenAndServe(listenAddress, nil))
 }
