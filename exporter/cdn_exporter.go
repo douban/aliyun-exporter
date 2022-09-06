@@ -120,7 +120,7 @@ func (e *CdnExporter) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(
 			e.backSourceBps,
 			prometheus.GaugeValue,
-			float64(point.Average / 1000000),
+			float64(point.Average / 1000 / 1000),
 			point.InstanceId,
 		)
 	}
