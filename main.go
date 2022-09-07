@@ -37,7 +37,7 @@ func main() {
 	for _, ae := range serviceArr {
 		switch ae {
 		case "acs_cdn":
-			cdn := exporter.CdnCloudExporter(newCdnClient())
+			cdn := exporter.CdnCloudExporter(CmsClient(), CdnClient())
 			prometheus.MustRegister(cdn)
 		default:
 			log.Println("暂不支持该服务，请根据提示选择服务。")

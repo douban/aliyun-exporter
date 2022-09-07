@@ -2,6 +2,7 @@ package exporter
 
 import (
 	"aliyun-exporter/collector"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/cdn"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/cms"
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,24 +14,35 @@ const (
 
 type CdnExporter struct {
 	client *cms.Client
+	cdnClient *cdn.Client
 
+	fluxHitRate            *prometheus.Desc
 	hitRate                *prometheus.Desc
 	backSourceBps          *prometheus.Desc
 	BPS                    *prometheus.Desc
 	l1Acc                  *prometheus.Desc
 	backSourceAcc          *prometheus.Desc
 	backSourceStatusRatio  *prometheus.Desc
-	StatusRatio            *prometheus.Desc
+	statusRatio            *prometheus.Desc
 }
 
 //实例化
-func CdnCloudExporter(c *cms.Client) *CdnExporter {
+func CdnCloudExporter(cmsClient *cms.Client, cdnClient *cdn.Client) *CdnExporter {
 	return &CdnExporter{
-		client: c,
+		client: cmsClient,
+		cdnClient: cdnClient,
 
+		fluxHitRate: prometheus.NewDesc(
+			prometheus.BuildFQName(cdnnamespace, "cdn", "flux_hit_rate"),
+			"边缘字节命中率(%)",
+			[]string{
+				"instanceId",
+			},
+			nil,
+		),
 		hitRate: prometheus.NewDesc(
 			prometheus.BuildFQName(cdnnamespace, "cdn", "hit_rate"),
-			"边缘字节命中率(%)",
+			"请求命中率(%)",
 			[]string{
 				"instanceId",
 			},
@@ -81,7 +93,7 @@ func CdnCloudExporter(c *cms.Client) *CdnExporter {
 			nil,
 		),
 
-		StatusRatio: prometheus.NewDesc(
+		statusRatio: prometheus.NewDesc(
 			prometheus.BuildFQName(cdnnamespace, "cdn", "status_ratio"),
 			"状态码占比(%)",
 			[]string{
@@ -95,27 +107,45 @@ func CdnCloudExporter(c *cms.Client) *CdnExporter {
 
 //导出
 func (e *CdnExporter) Describe(ch chan<- *prometheus.Desc) {
+	ch <- e.fluxHitRate
 	ch <- e.hitRate
 	ch <- e.backSourceBps
 	ch <- e.BPS
 	ch <- e.backSourceAcc
 	ch <- e.l1Acc
 	ch <- e.backSourceStatusRatio
-	ch <- e.StatusRatio
+	ch <- e.statusRatio
 }
 
 //收集
 func (e *CdnExporter) Collect(ch chan<- prometheus.Metric) {
 	cdnDashboard := collector.NewCdnExporter(e.client)
 
-	for _, point := range cdnDashboard.RetrieveHitRate() {
+	domains := collector.GetDomains(*e.cdnClient, "online")
+	//domains := []string{"vt3.doubanio.com"}
+	for _, domain := range domains {
+		reqHitRate := collector.GetReqHitRate(*e.cdnClient, domain)
+		// 去除掉数据量少的域名
+		if reqHitRate < 10 {
+			continue
+		}
 		ch <- prometheus.MustNewConstMetric(
 			e.hitRate,
+			prometheus.GaugeValue,
+			float64(reqHitRate),
+			domain,
+		)
+	}
+
+	for _, point := range cdnDashboard.RetrieveHitRate() {
+		ch <- prometheus.MustNewConstMetric(
+			e.fluxHitRate,
 			prometheus.GaugeValue,
 			float64(point.Average),
 			point.InstanceId,
 		)
 	}
+
 	for _, point := range cdnDashboard.RetrieveOriBps() {
 		ch <- prometheus.MustNewConstMetric(
 			e.backSourceBps,
@@ -144,7 +174,7 @@ func (e *CdnExporter) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(
 			e.BPS,
 			prometheus.GaugeValue,
-			float64(point.Average / 1000000),
+			float64(point.Average / 1000 / 1000),
 			point.InstanceId,
 		)
 	}
@@ -159,7 +189,7 @@ func (e *CdnExporter) Collect(ch chan<- prometheus.Metric) {
 	}
 	for _, point := range cdnDashboard.RetrieveStatusRatio() {
 		ch <- prometheus.MustNewConstMetric(
-			e.StatusRatio,
+			e.statusRatio,
 			prometheus.GaugeValue,
 			float64(point.Average),
 			point.InstanceId,
