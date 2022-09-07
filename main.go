@@ -21,6 +21,8 @@ var config struct {
 	port            int
 	service         string
 	metricsPath     string
+	rangeTime       int64
+	delayTime       int64
 }
 
 func main() {
@@ -31,13 +33,15 @@ func main() {
 	flag.IntVar(&(config.port), "port", 9180, "服务监听端口")
 	flag.StringVar(&(config.service), "service", "acs_cdn", "输出Metrics的服务，默认为全部")
 	flag.StringVar(&(config.metricsPath), "metricsPath", "/metrics", "metrics path 路径, 默认为 /metrics ")
+	flag.Int64Var(&(config.rangeTime), "rangeTime", 3600, "时间范围, 开始时间=now-rangeTime")
+	flag.Int64Var(&(config.delayTime), "delayTime", 180, "时间偏移量, 结束时间=now-delayTime")
 	flag.Parse()
 
 	serviceArr := strings.Split(config.service, ",")
 	for _, ae := range serviceArr {
 		switch ae {
 		case "acs_cdn":
-			cdn := exporter.CdnCloudExporter(CmsClient(), CdnClient())
+			cdn := exporter.CdnCloudExporter(CmsClient(), CdnClient(), config.rangeTime, config.delayTime)
 			prometheus.MustRegister(cdn)
 		default:
 			log.Println("暂不支持该服务，请根据提示选择服务。")

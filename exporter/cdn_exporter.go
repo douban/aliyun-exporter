@@ -15,6 +15,8 @@ const (
 type CdnExporter struct {
 	client *cms.Client
 	cdnClient *cdn.Client
+	rangeTime            int64
+	delayTime            int64
 
 	fluxHitRate            *prometheus.Desc
 	hitRate                *prometheus.Desc
@@ -27,10 +29,12 @@ type CdnExporter struct {
 }
 
 //实例化
-func CdnCloudExporter(cmsClient *cms.Client, cdnClient *cdn.Client) *CdnExporter {
+func CdnCloudExporter(cmsClient *cms.Client, cdnClient *cdn.Client, rangeTime int64, delayTime int64) *CdnExporter {
 	return &CdnExporter{
 		client: cmsClient,
 		cdnClient: cdnClient,
+		rangeTime: rangeTime,
+		delayTime: delayTime,
 
 		fluxHitRate: prometheus.NewDesc(
 			prometheus.BuildFQName(cdnnamespace, "cdn", "flux_hit_rate"),
@@ -124,7 +128,7 @@ func (e *CdnExporter) Collect(ch chan<- prometheus.Metric) {
 	domains := collector.GetDomains(*e.cdnClient, "online")
 	//domains := []string{"vt3.doubanio.com"}
 	for _, domain := range domains {
-		reqHitRate := collector.GetReqHitRate(*e.cdnClient, domain)
+		reqHitRate := collector.GetReqHitRate(*e.cdnClient, domain, e.rangeTime, e.delayTime)
 		// 去除掉数据量少的域名
 		if reqHitRate < 10 {
 			continue
