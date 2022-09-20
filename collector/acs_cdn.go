@@ -42,7 +42,7 @@ func (db *CdnExporter) RetrieveBPS() []datapoint {
 	return retrieve("BPS", db.project)
 }
 
-func (db *CdnExporter) RetrieveOriStatusRatio() []statusPoint {
+func (db *CdnExporter) RetrieveStatusRatio() []statusPoint {
 	statusMetrics := map[string]string{
 		"code1xx": "1xx",
 		"code2xx": "2xx",
@@ -65,7 +65,7 @@ func (db *CdnExporter) RetrieveOriStatusRatio() []statusPoint {
 	return response
 }
 
-func (db *CdnExporter) RetrieveStatusRatio() []statusPoint {
+func (db *CdnExporter) RetrieveOriStatusRatio() []statusPoint {
 	backSourceStatusMetrics := map[string]string{
 		"ori_code_ratio_1xx": "1xx",
 		"ori_code_ratio_2xx": "2xx",
