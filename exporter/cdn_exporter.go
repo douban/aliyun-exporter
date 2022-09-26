@@ -2,7 +2,9 @@ package exporter
 
 import (
 	"aliyun-exporter/collector"
+	"fmt"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/cdn"
+	"strconv"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/cms"
 	"github.com/prometheus/client_golang/prometheus"
@@ -139,6 +141,30 @@ func (e *CdnExporter) Collect(ch chan<- prometheus.Metric) {
 			float64(reqHitRate),
 			domain,
 		)
+
+		statusProportion := collector.GetStatusCode(*e.cdnClient, domain, e.rangeTime, e.delayTime)
+		for status, proportion := range statusProportion {
+			proportion, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", proportion), 64)
+			ch <- prometheus.MustNewConstMetric(
+				e.statusRatio,
+				prometheus.GaugeValue,
+				proportion,
+				domain,
+				status,
+			)
+		}
+
+		resourceStatus := collector.GetResourceStatusCode(*e.cdnClient, domain, e.rangeTime, e.delayTime)
+		for status, proportion := range resourceStatus {
+			proportion, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", proportion), 64)
+			ch <- prometheus.MustNewConstMetric(
+				e.backSourceStatusRatio,
+				prometheus.GaugeValue,
+				proportion,
+				domain,
+				status,
+			)
+		}
 	}
 
 	for _, point := range cdnDashboard.RetrieveHitRate() {
@@ -180,24 +206,6 @@ func (e *CdnExporter) Collect(ch chan<- prometheus.Metric) {
 			prometheus.GaugeValue,
 			float64(point.Average / 1000 / 1000),
 			point.InstanceId,
-		)
-	}
-	for _, point := range cdnDashboard.RetrieveOriStatusRatio() {
-		ch <- prometheus.MustNewConstMetric(
-			e.backSourceStatusRatio,
-			prometheus.GaugeValue,
-			float64(point.Average),
-			point.InstanceId,
-			point.Status,
-		)
-	}
-	for _, point := range cdnDashboard.RetrieveStatusRatio() {
-		ch <- prometheus.MustNewConstMetric(
-			e.statusRatio,
-			prometheus.GaugeValue,
-			float64(point.Average),
-			point.InstanceId,
-			point.Status,
 		)
 	}
 }
