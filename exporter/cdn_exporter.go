@@ -167,7 +167,7 @@ func (e *CdnExporter) Collect(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	for _, point := range cdnDashboard.RetrieveHitRate() {
+	for _, point := range cdnDashboard.RetrieveHitRate(e.rangeTime, e.delayTime) {
 		ch <- prometheus.MustNewConstMetric(
 			e.fluxHitRate,
 			prometheus.GaugeValue,
@@ -176,7 +176,7 @@ func (e *CdnExporter) Collect(ch chan<- prometheus.Metric) {
 		)
 	}
 
-	for _, point := range cdnDashboard.RetrieveOriBps() {
+	for _, point := range cdnDashboard.RetrieveOriBps(e.rangeTime, e.delayTime) {
 		ch <- prometheus.MustNewConstMetric(
 			e.backSourceBps,
 			prometheus.GaugeValue,
@@ -184,7 +184,7 @@ func (e *CdnExporter) Collect(ch chan<- prometheus.Metric) {
 			point.InstanceId,
 		)
 	}
-	for _, point := range cdnDashboard.RetrieveL1Acc() {
+	for _, point := range cdnDashboard.RetrieveL1Acc(e.rangeTime, e.delayTime) {
 		ch <- prometheus.MustNewConstMetric(
 			e.l1Acc,
 			prometheus.GaugeValue,
@@ -192,7 +192,7 @@ func (e *CdnExporter) Collect(ch chan<- prometheus.Metric) {
 			point.InstanceId,
 		)
 	}
-	for _, point := range cdnDashboard.RetrieveOriAcc() {
+	for _, point := range cdnDashboard.RetrieveOriAcc(e.rangeTime, e.delayTime) {
 		ch <- prometheus.MustNewConstMetric(
 			e.backSourceAcc,
 			prometheus.GaugeValue,
@@ -200,7 +200,7 @@ func (e *CdnExporter) Collect(ch chan<- prometheus.Metric) {
 			point.InstanceId,
 		)
 	}
-	for _, point := range cdnDashboard.RetrieveBPS() {
+	for _, point := range cdnDashboard.RetrieveBPS(e.rangeTime, e.delayTime) {
 		ch <- prometheus.MustNewConstMetric(
 			e.BPS,
 			prometheus.GaugeValue,
