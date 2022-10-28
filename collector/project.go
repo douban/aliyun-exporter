@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/cms"
 	"log"
+	"time"
 )
 
 type datapoint struct {
@@ -34,10 +35,12 @@ func defaultGetResponseFunc(client *cms.Client, request *cms.DescribeMetricLastR
 
 }
 
-func retrieve(metric string, p Project) []datapoint {
+func retrieve(metric string, p Project, rangeTime int64, delayTime int64) []datapoint {
 	request := cms.CreateDescribeMetricLastRequest()
 	request.Namespace = p.Namespace
 	request.MetricName = metric
+	request.StartTime = time.Now().UTC().Add(-time.Second * time.Duration(rangeTime)).Format(time.RFC3339)
+	request.EndTime = time.Now().UTC().Add(-time.Second * time.Duration(delayTime)).Format(time.RFC3339)
 	requestsStats.Inc()
 
 	datapoints := make([]datapoint, 0)
@@ -54,6 +57,9 @@ func retrieve(metric string, p Project) []datapoint {
 	} else if err := json.Unmarshal([]byte(source), &datapoints); err != nil {
 		responseFormatError.Inc()
 		log.Fatal("Cannot decode json reponse:",err)
+	}
+	if len(datapoints) == 0 {
+		log.Println(request, source)
 	}
 	return datapoints
 }
