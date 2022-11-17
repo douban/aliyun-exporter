@@ -39,8 +39,10 @@ func retrieve(metric string, p Project, rangeTime int64, delayTime int64) []data
 	request := cms.CreateDescribeMetricLastRequest()
 	request.Namespace = p.Namespace
 	request.MetricName = metric
-	request.StartTime = time.Now().UTC().Add(-time.Second * time.Duration(rangeTime)).Format(time.RFC3339)
-	request.EndTime = time.Now().UTC().Add(-time.Second * time.Duration(delayTime)).Format(time.RFC3339)
+	request.Scheme = "https"
+	loc, _:= time.LoadLocation("Asia/Shanghai")
+	request.StartTime = time.Now().UTC().Add(-time.Second * time.Duration(rangeTime)).In(loc).Format("2006-01-02 15:04:05")
+	request.EndTime = time.Now().UTC().Add(-time.Second * time.Duration(delayTime)).In(loc).Format("2006-01-02 15:04:05")
 	requestsStats.Inc()
 
 	datapoints := make([]datapoint, 0)

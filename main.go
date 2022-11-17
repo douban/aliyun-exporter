@@ -3,6 +3,10 @@ package main
 import (
 	"aliyun-exporter/exporter"
 	"flag"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk"
+	"github.com/aliyun/alibaba-cloud-sdk-go/sdk/auth/credentials"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/cdn"
+	"github.com/aliyun/alibaba-cloud-sdk-go/services/cms"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
@@ -37,11 +41,22 @@ func main() {
 	flag.Int64Var(&(config.delayTime), "delayTime", 180, "时间偏移量, 结束时间=now-delayTime")
 	flag.Parse()
 
+	cdnConfig := sdk.NewConfig()
+	credential := credentials.NewAccessKeyCredential(config.accessKeyId, config.accessKeySecret)
+	cdnClient, err := cdn.NewClientWithOptions(config.regionId, cdnConfig, credential)
+	if err != nil {
+		log.Fatal("init cdn client error")
+	}
+	cmsClient, err := cms.NewClientWithOptions(config.regionId, cdnConfig, credential)
+	if err != nil {
+		log.Fatal("init cms client error")
+	}
+
 	serviceArr := strings.Split(config.service, ",")
 	for _, ae := range serviceArr {
 		switch ae {
 		case "acs_cdn":
-			cdn := exporter.CdnCloudExporter(CmsClient(), CdnClient(), config.rangeTime, config.delayTime)
+			cdn := exporter.CdnCloudExporter(cmsClient, cdnClient, config.rangeTime, config.delayTime)
 			prometheus.MustRegister(cdn)
 		default:
 			log.Println("暂不支持该服务，请根据提示选择服务。")
