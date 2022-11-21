@@ -14,6 +14,7 @@ func GetDomains(cdnClient cdn.Client, status string) []string {
 	var domains []string
 	req := cdn.CreateDescribeUserDomainsRequest()
 	req.DomainStatus = status
+	req.Scheme = "https"
 
 	response, err := cdnClient.DescribeUserDomains(req)
 	if err != nil {
