@@ -4,10 +4,10 @@ import (
 	"aliyun-exporter/collector"
 	"fmt"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/cdn"
-	"strconv"
-
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/cms"
 	"github.com/prometheus/client_golang/prometheus"
+	"strconv"
+	"sync"
 )
 
 const (
@@ -15,28 +15,31 @@ const (
 )
 
 type CdnExporter struct {
-	client *cms.Client
+	client    *cms.Client
 	cdnClient *cdn.Client
-	rangeTime            int64
-	delayTime            int64
+	rangeTime int64
+	delayTime int64
+	domains   []string
 
-	fluxHitRate            *prometheus.Desc
-	hitRate                *prometheus.Desc
-	backSourceBps          *prometheus.Desc
-	BPS                    *prometheus.Desc
-	l1Acc                  *prometheus.Desc
-	backSourceAcc          *prometheus.Desc
-	backSourceStatusRatio  *prometheus.Desc
-	statusRatio            *prometheus.Desc
+	fluxHitRate           *prometheus.Desc
+	hitRate               *prometheus.Desc
+	backSourceBps         *prometheus.Desc
+	BPS                   *prometheus.Desc
+	l1Acc                 *prometheus.Desc
+	backSourceAcc         *prometheus.Desc
+	backSourceStatusRatio *prometheus.Desc
+	statusRatio           *prometheus.Desc
 }
 
-//实例化
+// CdnCloudExporter 实例化
 func CdnCloudExporter(cmsClient *cms.Client, cdnClient *cdn.Client, rangeTime int64, delayTime int64) *CdnExporter {
+	domains := collector.GetDomains(*cdnClient, "online")
 	return &CdnExporter{
-		client: cmsClient,
+		client:    cmsClient,
 		cdnClient: cdnClient,
 		rangeTime: rangeTime,
 		delayTime: delayTime,
+		domains:   domains,
 
 		fluxHitRate: prometheus.NewDesc(
 			prometheus.BuildFQName(cdnnamespace, "cdn", "flux_hit_rate"),
@@ -111,7 +114,7 @@ func CdnCloudExporter(cmsClient *cms.Client, cdnClient *cdn.Client, rangeTime in
 	}
 }
 
-//导出
+// Describe 导出
 func (e *CdnExporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- e.fluxHitRate
 	ch <- e.hitRate
@@ -123,13 +126,14 @@ func (e *CdnExporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- e.statusRatio
 }
 
-//收集
+// Collect 收集
 func (e *CdnExporter) Collect(ch chan<- prometheus.Metric) {
 	cdnDashboard := collector.NewCdnExporter(e.client)
+	var wg sync.WaitGroup
 
-	domains := collector.GetDomains(*e.cdnClient, "online")
 	//domains := []string{"vt3.doubanio.com"}
-	for _, domain := range domains {
+	for _, domain := range e.domains {
+		domain := domain
 		reqHitRate := collector.GetReqHitRate(*e.cdnClient, domain, e.rangeTime, e.delayTime)
 		// 去除掉数据量少的域名
 		if reqHitRate < 10 {
@@ -138,74 +142,106 @@ func (e *CdnExporter) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(
 			e.hitRate,
 			prometheus.GaugeValue,
-			float64(reqHitRate),
+			reqHitRate,
 			domain,
 		)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			statusProportion := collector.GetStatusCode(*e.cdnClient, domain, e.rangeTime, e.delayTime)
+			for status, proportion := range statusProportion {
+				proportion, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", proportion), 64)
+				ch <- prometheus.MustNewConstMetric(
+					e.statusRatio,
+					prometheus.GaugeValue,
+					proportion,
+					domain,
+					status,
+				)
+			}
+		}()
 
-		statusProportion := collector.GetStatusCode(*e.cdnClient, domain, e.rangeTime, e.delayTime)
-		for status, proportion := range statusProportion {
-			proportion, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", proportion), 64)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			resourceStatus := collector.GetResourceStatusCode(*e.cdnClient, domain, e.rangeTime, e.delayTime)
+			for status, proportion := range resourceStatus {
+				proportion, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", proportion), 64)
+				ch <- prometheus.MustNewConstMetric(
+					e.backSourceStatusRatio,
+					prometheus.GaugeValue,
+					proportion,
+					domain,
+					status,
+				)
+			}
+		}()
+
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for _, point := range cdnDashboard.RetrieveHitRate(e.rangeTime, e.delayTime) {
 			ch <- prometheus.MustNewConstMetric(
-				e.statusRatio,
+				e.fluxHitRate,
 				prometheus.GaugeValue,
-				proportion,
-				domain,
-				status,
+				point.Average,
+				point.InstanceId,
 			)
 		}
+	}()
 
-		resourceStatus := collector.GetResourceStatusCode(*e.cdnClient, domain, e.rangeTime, e.delayTime)
-		for status, proportion := range resourceStatus {
-			proportion, _ = strconv.ParseFloat(fmt.Sprintf("%.3f", proportion), 64)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for _, point := range cdnDashboard.RetrieveOriBps(e.rangeTime, e.delayTime) {
 			ch <- prometheus.MustNewConstMetric(
-				e.backSourceStatusRatio,
+				e.backSourceBps,
 				prometheus.GaugeValue,
-				proportion,
-				domain,
-				status,
+				point.Average/1000/1000,
+				point.InstanceId,
 			)
 		}
-	}
+	}()
 
-	for _, point := range cdnDashboard.RetrieveHitRate(e.rangeTime, e.delayTime) {
-		ch <- prometheus.MustNewConstMetric(
-			e.fluxHitRate,
-			prometheus.GaugeValue,
-			float64(point.Average),
-			point.InstanceId,
-		)
-	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for _, point := range cdnDashboard.RetrieveL1Acc(e.rangeTime, e.delayTime) {
+			ch <- prometheus.MustNewConstMetric(
+				e.l1Acc,
+				prometheus.GaugeValue,
+				point.Average,
+				point.InstanceId,
+			)
+		}
+	}()
 
-	for _, point := range cdnDashboard.RetrieveOriBps(e.rangeTime, e.delayTime) {
-		ch <- prometheus.MustNewConstMetric(
-			e.backSourceBps,
-			prometheus.GaugeValue,
-			float64(point.Average / 1000 / 1000),
-			point.InstanceId,
-		)
-	}
-	for _, point := range cdnDashboard.RetrieveL1Acc(e.rangeTime, e.delayTime) {
-		ch <- prometheus.MustNewConstMetric(
-			e.l1Acc,
-			prometheus.GaugeValue,
-			float64(point.Average),
-			point.InstanceId,
-		)
-	}
-	for _, point := range cdnDashboard.RetrieveOriAcc(e.rangeTime, e.delayTime) {
-		ch <- prometheus.MustNewConstMetric(
-			e.backSourceAcc,
-			prometheus.GaugeValue,
-			float64(point.Average),
-			point.InstanceId,
-		)
-	}
-	for _, point := range cdnDashboard.RetrieveBPS(e.rangeTime, e.delayTime) {
-		ch <- prometheus.MustNewConstMetric(
-			e.BPS,
-			prometheus.GaugeValue,
-			float64(point.Average / 1000 / 1000),
-			point.InstanceId,
-		)
-	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for _, point := range cdnDashboard.RetrieveOriAcc(e.rangeTime, e.delayTime) {
+			ch <- prometheus.MustNewConstMetric(
+				e.backSourceAcc,
+				prometheus.GaugeValue,
+				point.Average,
+				point.InstanceId,
+			)
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for _, point := range cdnDashboard.RetrieveBPS(e.rangeTime, e.delayTime) {
+			ch <- prometheus.MustNewConstMetric(
+				e.BPS,
+				prometheus.GaugeValue,
+				point.Average/1000/1000,
+				point.InstanceId,
+			)
+		}
+	}()
+	wg.Wait()
 }
