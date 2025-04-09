@@ -37,7 +37,7 @@ func main() {
 	flag.IntVar(&(config.port), "port", 9180, "服务监听端口")
 	flag.StringVar(&(config.service), "service", "acs_cdn", "输出Metrics的服务，默认为全部")
 	flag.StringVar(&(config.metricsPath), "metricsPath", "/metrics", "metrics path 路径, 默认为 /metrics ")
-	flag.Int64Var(&(config.rangeTime), "rangeTime", 3600, "时间范围, 开始时间=now-rangeTime")
+	flag.Int64Var(&(config.rangeTime), "rangeTime", 480, "时间范围, 开始时间=now-rangeTime")
 	flag.Int64Var(&(config.delayTime), "delayTime", 180, "时间偏移量, 结束时间=now-delayTime")
 	flag.Parse()
 
